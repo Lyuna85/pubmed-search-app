@@ -71,8 +71,6 @@ def fetch_details(pmids, email):
 
         # 출판일
         pub_year = article.findtext(".//PubDate/Year", "")
-        pub_month = article.findtext(".//PubDate/Month", "")
-        pub_date = f"{pub_year} {pub_month}".strip()
 
         # 초록
         abstract_texts = article.findall(".//AbstractText")
@@ -97,15 +95,15 @@ def fetch_details(pmids, email):
                 pmc_id = article_id.text or ""
 
         articles.append({
+            "Year": pub_year,
+            "Journal": journal,
+            "First_Author": author_str,
+            "Title": title,
+            "Link": f"https://pubmed.ncbi.nlm.nih.gov/{pmid}/",
+            "Abstract": abstract,
             "PMID": pmid,
-            "제목": title,
-            "저자": author_str,
-            "저널": journal,
-            "출판일": pub_date,
-            "초록": abstract,
             "DOI": doi,
             "PMC_ID": pmc_id,
-            "링크": f"https://pubmed.ncbi.nlm.nih.gov/{pmid}/",
         })
 
     return articles
@@ -114,6 +112,22 @@ def fetch_details(pmids, email):
 # ── UI ──────────────────────────────────────────────────────────────────────
 
 st.set_page_config(page_title="PubMed 논문 검색", page_icon="🔬", layout="wide")
+
+# 인증 블록
+if "authenticated" not in st.session_state:
+    st.session_state.authenticated = False
+
+if not st.session_state.authenticated:
+    st.subheader("🔐 접근 제한")
+    pw = st.text_input("비밀번호를 입력하세요", type="password")
+    if st.button("확인"):
+        if pw == st.secrets["APP_PASSWORD"]:
+            st.session_state.authenticated = True
+            st.rerun()
+        else:
+            st.error("비밀번호가 올바르지 않습니다.")
+    st.stop()
+
 st.title("🔬 PubMed 논문 검색")
 st.caption("NCBI PubMed API를 이용한 논문 검색 도구")
 
@@ -136,15 +150,12 @@ with st.form("search_form"):
     with col2:
         max_results = st.selectbox("결과 수", [10, 20, 50], index=1)
 
-    col3, col4, col5 = st.columns([1, 1, 2])
-    with col3:
-        use_date = st.checkbox("날짜 필터 사용")
-    with col4:
-        year_start = st.number_input("시작 연도", min_value=1900, max_value=datetime.now().year,
-                                     value=2020, disabled=not use_date)
-    with col5:
-        year_end = st.number_input("종료 연도", min_value=1900, max_value=datetime.now().year,
-                                   value=datetime.now().year, disabled=not use_date)
+    year_start, year_end = st.slider(
+        "출판 연도 범위",
+        min_value=1900,
+        max_value=datetime.now().year,
+        value=(2020, datetime.now().year),
+    )
 
     submitted = st.form_submit_button("검색", use_container_width=True, type="primary")
 
@@ -152,8 +163,8 @@ with st.form("search_form"):
 if submitted and query.strip():
     with st.spinner("PubMed에서 논문을 검색 중입니다..."):
         try:
-            y_start = int(year_start) if use_date else None
-            y_end = int(year_end) if use_date else None
+            y_start = int(year_start)
+            y_end = int(year_end)
 
             pmids = search_pubmed(query.strip(), max_results, user_email, y_start, y_end)
 
@@ -165,7 +176,7 @@ if submitted and query.strip():
 
                 # CSV 다운로드
                 df = pd.DataFrame(articles)
-                csv = df.drop(columns=["초록", "PMC_ID"]).to_csv(index=False, encoding="utf-8-sig")
+                csv = df.drop(columns=["PMC_ID"]).to_csv(index=False, encoding="utf-8-sig")
                 st.download_button(
                     label="📥 CSV 다운로드",
                     data=csv,
@@ -178,15 +189,15 @@ if submitted and query.strip():
                 # 결과 목록
                 for i, art in enumerate(articles, 1):
                     with st.container():
-                        st.markdown(f"#### {i}. [{art['제목']}]({art['링크']})")
+                        st.markdown(f"#### {i}. [{art['Title']}]({art['Link']})")
                         meta_col1, meta_col2, meta_col3 = st.columns(3)
                         with meta_col1:
-                            first_author = art['저자'].split(',')[0] if art['저자'] else '저자 정보 없음'
+                            first_author = art['First_Author'].split(',')[0] if art['First_Author'] else '저자 정보 없음'
                             st.caption(f"👤 {first_author}")
                         with meta_col2:
-                            st.caption(f"📰 {art['저널'] or '저널 정보 없음'}")
+                            st.caption(f"📰 {art['Journal'] or '저널 정보 없음'}")
                         with meta_col3:
-                            st.caption(f"📅 {art['출판일'] or '날짜 정보 없음'}")
+                            st.caption(f"📅 {art['Year'] or '날짜 정보 없음'}")
 
                         if art["DOI"]:
                             st.caption(f"🔗 DOI: https://doi.org/{art['DOI']}")
@@ -212,7 +223,7 @@ if submitted and query.strip():
                                     st.link_button("📄 PDF 보기 (PMC)", f"https://www.ncbi.nlm.nih.gov/pmc/articles/{art['PMC_ID']}/pdf/")
 
                         with st.expander("초록 보기"):
-                            st.markdown(art["초록"])
+                            st.markdown(art["Abstract"])
 
                         st.divider()
 
