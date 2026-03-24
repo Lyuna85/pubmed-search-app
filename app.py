@@ -61,9 +61,7 @@ def fetch_details(pmids, email):
             fore = author.findtext("ForeName", "")
             if last:
                 authors.append(f"{last} {fore}".strip())
-        author_str = ", ".join(authors[:5])
-        if len(authors) > 5:
-            author_str += " et al."
+        author_str = authors[0] if authors else ""
 
         # 저널
         journal_el = article.find(".//Journal/Title")
