@@ -177,10 +177,12 @@ if submitted and query.strip():
                 # CSV 다운로드
                 df = pd.DataFrame(articles)
                 csv = df.drop(columns=["PMC_ID"]).to_csv(index=False, encoding="utf-8-sig")
+                default_name = f"pubmed_{query[:30].replace(' ', '_')}"
+                csv_filename = st.text_input("파일 이름", value=default_name)
                 st.download_button(
                     label="📥 CSV 다운로드",
                     data=csv,
-                    file_name=f"pubmed_{query[:30].replace(' ', '_')}.csv",
+                    file_name=f"{csv_filename}.csv",
                     mime="text/csv",
                 )
 
