@@ -3,8 +3,6 @@ import requests
 import xml.etree.ElementTree as ET
 import pandas as pd
 from datetime import datetime
-import anthropic
-
 ESEARCH_URL = "https://eutils.ncbi.nlm.nih.gov/entrez/eutils/esearch.fcgi"
 EFETCH_URL = "https://eutils.ncbi.nlm.nih.gov/entrez/eutils/efetch.fcgi"
 
