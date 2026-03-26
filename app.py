@@ -3,6 +3,7 @@ import requests
 import xml.etree.ElementTree as ET
 import pandas as pd
 from datetime import datetime
+import anthropic
 
 ESEARCH_URL = "https://eutils.ncbi.nlm.nih.gov/entrez/eutils/esearch.fcgi"
 EFETCH_URL = "https://eutils.ncbi.nlm.nih.gov/entrez/eutils/efetch.fcgi"
@@ -169,63 +170,8 @@ if submitted and query.strip():
             if not pmids:
                 st.warning("검색 결과가 없습니다. 다른 검색어를 시도해보세요.")
             else:
-                articles = fetch_details(pmids, user_email)
-                st.success(f"**{len(articles)}개** 논문을 찾았습니다.")
-
-                # CSV 다운로드
-                df = pd.DataFrame(articles)
-                csv = df.drop(columns=["PMC_ID"]).to_csv(index=False, encoding="utf-8-sig")
-                default_name = f"pubmed_{query[:30].replace(' ', '_')}"
-                csv_filename = st.text_input("파일 이름", value=default_name)
-                st.download_button(
-                    label="📥 CSV 다운로드",
-                    data=csv,
-                    file_name=f"{csv_filename}.csv",
-                    mime="text/csv",
-                )
-
-                st.divider()
-
-                # 결과 목록
-                for i, art in enumerate(articles, 1):
-                    with st.container():
-                        st.markdown(f"#### {i}. [{art['Title']}]({art['Link']})")
-                        meta_col1, meta_col2, meta_col3 = st.columns(3)
-                        with meta_col1:
-                            first_author = art['First_Author'].split(',')[0] if art['First_Author'] else '저자 정보 없음'
-                            st.caption(f"👤 {first_author}")
-                        with meta_col2:
-                            st.caption(f"📰 {art['Journal'] or '저널 정보 없음'}")
-                        with meta_col3:
-                            st.caption(f"📅 {art['Year'] or '날짜 정보 없음'}")
-
-                        if art["DOI"]:
-                            st.caption(f"🔗 DOI: https://doi.org/{art['DOI']}")
-
-                        btn_col1, btn_col2 = st.columns([1, 5])
-                        with btn_col1:
-                            if art["PMC_ID"]:
-                                pmc_num = art["PMC_ID"].replace("PMC", "")
-                                pdf_url = f"https://www.ncbi.nlm.nih.gov/pmc/articles/{art['PMC_ID']}/pdf/"
-                                try:
-                                    pdf_resp = requests.get(pdf_url, timeout=15, allow_redirects=True)
-                                    if pdf_resp.status_code == 200 and "application/pdf" in pdf_resp.headers.get("Content-Type", ""):
-                                        st.download_button(
-                                            label="📄 PDF 다운로드",
-                                            data=pdf_resp.content,
-                                            file_name=f"{art['PMC_ID']}.pdf",
-                                            mime="application/pdf",
-                                            key=f"pdf_{art['PMID']}",
-                                        )
-                                    else:
-                                        st.link_button("📄 PDF 보기 (PMC)", f"https://www.ncbi.nlm.nih.gov/pmc/articles/{art['PMC_ID']}/pdf/")
-                                except Exception:
-                                    st.link_button("📄 PDF 보기 (PMC)", f"https://www.ncbi.nlm.nih.gov/pmc/articles/{art['PMC_ID']}/pdf/")
-
-                        with st.expander("초록 보기"):
-                            st.markdown(art["Abstract"])
-
-                        st.divider()
+                st.session_state.articles = fetch_details(pmids, user_email)
+                st.session_state.last_query = query.strip()
 
         except requests.exceptions.Timeout:
             st.error("요청 시간이 초과되었습니다. 잠시 후 다시 시도해주세요.")
@@ -234,3 +180,67 @@ if submitted and query.strip():
 
 elif submitted and not query.strip():
     st.warning("검색어를 입력해주세요.")
+
+# 결과 표시
+if "articles" in st.session_state and st.session_state.articles:
+    articles = st.session_state.articles
+    last_query = st.session_state.get("last_query", "")
+
+    st.success(f"**{len(articles)}개** 논문을 찾았습니다.")
+
+    # 결과 내 재검색
+    filter_term = st.text_input("결과 내 재검색 (쉼표로 구분 시 AND 검색)", placeholder="예: EGFR, lung cancer", key="filter")
+    if filter_term.strip():
+        keywords = [k.strip() for k in filter_term.strip().lower().split(",") if k.strip()]
+        articles = [
+            a for a in articles
+            if all(
+                kw in a["Title"].lower()
+                or kw in a["First_Author"].lower()
+                or kw in a["Journal"].lower()
+                or kw in a["Abstract"].lower()
+                for kw in keywords
+            )
+        ]
+        st.caption(f"재검색 결과: **{len(articles)}개** (키워드: {', '.join(keywords)})")
+
+    # CSV 다운로드
+    df = pd.DataFrame(articles)
+    csv = df.drop(columns=["PMC_ID"]).to_csv(index=False, encoding="utf-8-sig")
+    default_name = f"pubmed_{last_query[:30].replace(' ', '_')}"
+    csv_filename = st.text_input("파일 이름", value=default_name)
+    st.download_button(
+        label="📥 CSV 다운로드",
+        data=csv,
+        file_name=f"{csv_filename}.csv",
+        mime="text/csv",
+    )
+
+    st.divider()
+
+    # 결과 목록
+    for i, art in enumerate(articles, 1):
+        with st.container():
+            st.markdown(f"#### {i}. [{art['Title']}]({art['Link']})")
+            meta_col1, meta_col2, meta_col3 = st.columns(3)
+            with meta_col1:
+                first_author = art['First_Author'].split(',')[0] if art['First_Author'] else '저자 정보 없음'
+                st.caption(f"👤 {first_author}")
+            with meta_col2:
+                st.caption(f"📰 {art['Journal'] or '저널 정보 없음'}")
+            with meta_col3:
+                st.caption(f"📅 {art['Year'] or '날짜 정보 없음'}")
+
+            if art["DOI"]:
+                st.caption(f"🔗 DOI: https://doi.org/{art['DOI']}")
+
+            btn_col1, btn_col2 = st.columns([1, 5])
+            with btn_col1:
+                if art["PMC_ID"]:
+                    pmc_url = f"https://www.ncbi.nlm.nih.gov/pmc/articles/{art['PMC_ID']}/"
+                    st.link_button("📄 PDF 보기 (PMC)", pmc_url)
+
+            with st.expander("초록 보기"):
+                st.markdown(art["Abstract"])
+
+            st.divider()
