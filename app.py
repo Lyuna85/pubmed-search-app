@@ -143,7 +143,7 @@ with st.sidebar:
 with st.form("search_form"):
     col1, col2 = st.columns([3, 1])
     with col1:
-        query = st.text_input("검색어", placeholder="예: COVID-19 vaccine efficacy")
+        query = st.text_input("검색어 (쉼표로 구분 시 AND 검색)", placeholder="예: EGFR, lung cancer, mutation")
     with col2:
         max_results = st.selectbox("결과 수", [10, 20, 50], index=1)
 
@@ -163,13 +163,16 @@ if submitted and query.strip():
             y_start = int(year_start)
             y_end = int(year_end)
 
-            pmids = search_pubmed(query.strip(), max_results, user_email, y_start, y_end)
+            terms = [t.strip() for t in query.strip().split(",") if t.strip()]
+            pubmed_query = " AND ".join(terms)
+
+            pmids = search_pubmed(pubmed_query, max_results, user_email, y_start, y_end)
 
             if not pmids:
                 st.warning("검색 결과가 없습니다. 다른 검색어를 시도해보세요.")
             else:
                 st.session_state.articles = fetch_details(pmids, user_email)
-                st.session_state.last_query = query.strip()
+                st.session_state.last_query = pubmed_query
 
         except requests.exceptions.Timeout:
             st.error("요청 시간이 초과되었습니다. 잠시 후 다시 시도해주세요.")
