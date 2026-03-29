@@ -143,9 +143,15 @@ with st.sidebar:
 with st.form("search_form"):
     col1, col2 = st.columns([3, 1])
     with col1:
-        query = st.text_input("검색어 (쉼표로 구분 시 AND 검색)", placeholder="예: EGFR, lung cancer, mutation")
+        query = st.text_input(
+            "검색어 (쉼표로 구분 시 AND 검색)",
+            placeholder="예: EGFR, lung cancer, mutation",
+            help="저자 검색: 검색어에 [au] 태그 사용 가능 — 예: Kim J[au], EGFR"
+        )
     with col2:
         max_results = st.selectbox("결과 수", [10, 20, 50], index=1)
+
+    author_query = st.text_input("저자명 (쉼표로 구분 시 OR 검색)", placeholder="예: Kim J, Park S")
 
     year_start, year_end = st.slider(
         "출판 연도 범위",
@@ -157,7 +163,7 @@ with st.form("search_form"):
     submitted = st.form_submit_button("검색", use_container_width=True, type="primary")
 
 # 검색 실행
-if submitted and query.strip():
+if submitted and (query.strip() or author_query.strip()):
     with st.spinner("PubMed에서 논문을 검색 중입니다..."):
         try:
             y_start = int(year_start)
@@ -165,6 +171,13 @@ if submitted and query.strip():
 
             terms = [t.strip() for t in query.strip().split(",") if t.strip()]
             pubmed_query = " AND ".join(terms)
+
+            if author_query.strip():
+                authors = [a.strip() for a in author_query.strip().split(",") if a.strip()]
+                author_part = " OR ".join(f'"{a}"[au]' for a in authors)
+                if len(authors) > 1:
+                    author_part = f"({author_part})"
+                pubmed_query = f"{pubmed_query} AND {author_part}" if pubmed_query else author_part
 
             pmids = search_pubmed(pubmed_query, max_results, user_email, y_start, y_end)
 
@@ -179,8 +192,8 @@ if submitted and query.strip():
         except requests.exceptions.RequestException as e:
             st.error(f"네트워크 오류가 발생했습니다: {e}")
 
-elif submitted and not query.strip():
-    st.warning("검색어를 입력해주세요.")
+elif submitted and not query.strip() and not author_query.strip():
+    st.warning("검색어 또는 저자명을 입력해주세요.")
 
 # 결과 표시
 if "articles" in st.session_state and st.session_state.articles:
