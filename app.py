@@ -13,7 +13,7 @@ def search_pubmed(query, max_results, email, year_start=None, year_end=None):
         "term": query,
         "retmax": max_results,
         "retmode": "json",
-        "sort": "relevance",
+        "sort": "pub_date",
         "email": email,
         "tool": "pubmed-streamlit-app",
     }
