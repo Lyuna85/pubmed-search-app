@@ -148,7 +148,7 @@ with st.form("search_form"):
             help="저자 검색: 검색어에 [au] 태그 사용 가능 — 예: Kim J[au], EGFR"
         )
     with col2:
-        max_results = st.selectbox("결과 수", [10, 20, 50], index=1)
+        max_results = st.selectbox("결과 수", [10, 20, 50, 100], index=1)
 
     author_query = st.text_input("저자명 (쉼표로 구분 시 OR 검색)", placeholder="예: Kim J, Park S")
 
