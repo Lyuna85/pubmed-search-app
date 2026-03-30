@@ -18,9 +18,7 @@ def search_pubmed(query, max_results, email, year_start=None, year_end=None):
         "tool": "pubmed-streamlit-app",
     }
     if year_start and year_end:
-        params["mindate"] = f"{year_start}/01/01"
-        params["maxdate"] = f"{year_end}/12/31"
-        params["datetype"] = "pdat"
+        params["term"] = f'({query}) AND ("{year_start}"[pdat] : "{year_end}"[pdat])'
 
     response = requests.get(ESEARCH_URL, params=params, timeout=10)
     response.raise_for_status()
