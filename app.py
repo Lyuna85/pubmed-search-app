@@ -13,12 +13,13 @@ def search_pubmed(query, max_results, email, year_start=None, year_end=None):
         "term": query,
         "retmax": max_results,
         "retmode": "json",
-        "sort": "pub_date",
         "email": email,
         "tool": "pubmed-streamlit-app",
     }
     if year_start and year_end:
-        params["term"] = f'({query}) AND ("{year_start}"[pdat] : "{year_end}"[pdat])'
+        params["mindate"] = f"{year_start}/01/01"
+        params["maxdate"] = f"{year_end}/12/31"
+        params["datetype"] = "pdat"
 
     response = requests.get(ESEARCH_URL, params=params, timeout=10)
     response.raise_for_status()
@@ -182,7 +183,9 @@ if submitted and (query.strip() or author_query.strip()):
             if not pmids:
                 st.warning("검색 결과가 없습니다. 다른 검색어를 시도해보세요.")
             else:
-                st.session_state.articles = fetch_details(pmids, user_email)
+                articles = fetch_details(pmids, user_email)
+                articles.sort(key=lambda x: x["Year"] or "0", reverse=True)
+                st.session_state.articles = articles
                 st.session_state.last_query = pubmed_query
 
         except requests.exceptions.Timeout:
