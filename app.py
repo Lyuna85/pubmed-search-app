@@ -140,7 +140,7 @@ with st.sidebar:
 
 # 검색 폼
 with st.form("search_form"):
-    col1, col2 = st.columns([3, 1])
+    col1, col2, col3 = st.columns([3, 1, 1])
     with col1:
         query = st.text_input(
             "검색어 (쉼표로 구분 시 AND 검색)",
@@ -149,6 +149,8 @@ with st.form("search_form"):
         )
     with col2:
         max_results = st.selectbox("결과 수", [10, 20, 50, 100], index=1)
+    with col3:
+        search_field = st.selectbox("검색 범위", ["전체 필드", "제목/초록", "제목만"], index=1)
 
     author_query = st.text_input("저자명 (쉼표로 구분 시 OR 검색)", placeholder="예: Kim J, Park S")
 
@@ -170,8 +172,9 @@ if submitted and (query.strip() or author_query.strip()):
             y_start = int(year_start) if use_date else None
             y_end = int(year_end) if use_date else None
 
+            field_tag = {"전체 필드": "", "제목/초록": "[tiab]", "제목만": "[ti]"}[search_field]
             terms = [t.strip() for t in query.strip().split(",") if t.strip()]
-            pubmed_query = " AND ".join(terms)
+            pubmed_query = " AND ".join(f'"{t}"{field_tag}' if field_tag else t for t in terms)
 
             if author_query.strip():
                 authors = [a.strip() for a in author_query.strip().split(",") if a.strip()]
