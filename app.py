@@ -152,11 +152,13 @@ with st.form("search_form"):
 
     author_query = st.text_input("저자명 (쉼표로 구분 시 OR 검색)", placeholder="예: Kim J, Park S")
 
+    use_date = st.checkbox("출판 연도 범위 필터 사용")
     year_start, year_end = st.slider(
         "출판 연도 범위",
         min_value=1900,
         max_value=datetime.now().year,
         value=(2020, datetime.now().year),
+        disabled=not use_date,
     )
 
     submitted = st.form_submit_button("검색", use_container_width=True, type="primary")
@@ -165,8 +167,8 @@ with st.form("search_form"):
 if submitted and (query.strip() or author_query.strip()):
     with st.spinner("PubMed에서 논문을 검색 중입니다..."):
         try:
-            y_start = int(year_start)
-            y_end = int(year_end)
+            y_start = int(year_start) if use_date else None
+            y_end = int(year_end) if use_date else None
 
             terms = [t.strip() for t in query.strip().split(",") if t.strip()]
             pubmed_query = " AND ".join(terms)
