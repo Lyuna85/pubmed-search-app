@@ -27,6 +27,20 @@ def search_pubmed(query, max_results, email, year_start=None, year_end=None):
     return data["esearchresult"]["idlist"]
 
 
+def fetch_citations(pmids):
+    try:
+        response = requests.get(
+            "https://icite.od.nih.gov/api/pubs",
+            params={"pmids": ",".join(pmids)},
+            timeout=15,
+        )
+        response.raise_for_status()
+        data = response.json()
+        return {str(p["pmid"]): p.get("citation_count", 0) for p in data.get("data", [])}
+    except Exception:
+        return {}
+
+
 def fetch_details(pmids, email):
     if not pmids:
         return []
@@ -138,6 +152,15 @@ with st.sidebar:
     if not user_email:
         st.warning("이메일을 입력하면 NCBI 서버에 요청자 정보가 기록됩니다.")
 
+    st.divider()
+    st.subheader("결과 옵션")
+    remove_duplicates = st.checkbox("중복 논문 제거", value=True)
+    show_citations = st.checkbox("인용수 표시 및 정렬", value=False)
+    if show_citations:
+        sort_by = st.radio("정렬 기준", ["연도 내림차순", "인용수 내림차순"], index=0)
+    else:
+        sort_by = "연도 내림차순"
+
 # 검색 폼
 with st.form("search_form"):
     col1, col2, col3 = st.columns([3, 1, 1])
@@ -189,8 +212,26 @@ if submitted and (query.strip() or author_query.strip()):
                 st.warning("검색 결과가 없습니다. 다른 검색어를 시도해보세요.")
             else:
                 articles = fetch_details(pmids, user_email)
-                articles.sort(key=lambda x: x["Year"] or "0", reverse=True)
+
+                if remove_duplicates:
+                    seen = set()
+                    articles = [a for a in articles if not (a["PMID"] in seen or seen.add(a["PMID"]))]
+
+                if show_citations:
+                    citations = fetch_citations([a["PMID"] for a in articles])
+                    for a in articles:
+                        a["Citations"] = citations.get(a["PMID"], 0)
+                else:
+                    for a in articles:
+                        a["Citations"] = None
+
+                if sort_by == "인용수 내림차순":
+                    articles.sort(key=lambda x: x["Citations"] or 0, reverse=True)
+                else:
+                    articles.sort(key=lambda x: x["Year"] or "0", reverse=True)
+
                 st.session_state.articles = articles
+                st.session_state.show_citations = show_citations
                 st.session_state.last_query = pubmed_query
 
         except requests.exceptions.Timeout:
@@ -250,6 +291,9 @@ if "articles" in st.session_state and st.session_state.articles:
                 st.caption(f"📰 {art['Journal'] or '저널 정보 없음'}")
             with meta_col3:
                 st.caption(f"📅 {art['Year'] or '날짜 정보 없음'}")
+
+            if st.session_state.get("show_citations") and art.get("Citations") is not None:
+                st.caption(f"📊 인용수: {art['Citations']}")
 
             if art["DOI"]:
                 st.caption(f"🔗 DOI: https://doi.org/{art['DOI']}")
