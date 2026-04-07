@@ -3,8 +3,30 @@ import requests
 import xml.etree.ElementTree as ET
 import pandas as pd
 from datetime import datetime
+from openai import AzureOpenAI
 ESEARCH_URL = "https://eutils.ncbi.nlm.nih.gov/entrez/eutils/esearch.fcgi"
 EFETCH_URL = "https://eutils.ncbi.nlm.nih.gov/entrez/eutils/efetch.fcgi"
+
+
+@st.cache_data(show_spinner=False)
+def translate_abstract(abstract):
+    try:
+        client = AzureOpenAI(
+            api_key=st.secrets["AZURE_OPENAI_KEY"],
+            azure_endpoint=st.secrets["AZURE_OPENAI_ENDPOINT"],
+            api_version="2024-02-01",
+        )
+        response = client.chat.completions.create(
+            model=st.secrets["AZURE_OPENAI_DEPLOYMENT"],
+            messages=[
+                {"role": "system", "content": "논문 초록을 한국어로 번역해줘. 학술적 표현을 유지하고 번역문만 출력해."},
+                {"role": "user", "content": abstract},
+            ],
+            temperature=0.3,
+        )
+        return response.choices[0].message.content
+    except Exception as e:
+        return f"번역 오류: {e}"
 
 
 def search_pubmed(query, max_results, email, year_start=None, year_end=None):
@@ -306,5 +328,10 @@ if "articles" in st.session_state and st.session_state.articles:
 
             with st.expander("초록 보기"):
                 st.markdown(art["Abstract"])
+                if st.button("🇰🇷 한국어 번역", key=f"translate_{art['PMID']}"):
+                    with st.spinner("번역 중..."):
+                        translated = translate_abstract(art["Abstract"])
+                    st.markdown("---")
+                    st.markdown(translated)
 
             st.divider()
