@@ -95,7 +95,7 @@ def fetch_details(pmids, email):
             fore = author.findtext("ForeName", "")
             if last:
                 authors.append(f"{last} {fore}".strip())
-        author_str = authors[0] if authors else ""
+        author_str = ", ".join(authors) if authors else ""
 
         # 저널
         journal_el = article.find(".//Journal/Title")
@@ -289,6 +289,7 @@ if "articles" in st.session_state and st.session_state.articles:
 
     # CSV 다운로드
     df = pd.DataFrame(articles)
+    df["First_Author"] = df["First_Author"].apply(lambda x: x.split(",")[0].strip() if x else "")
     csv = df.drop(columns=["PMC_ID"]).to_csv(index=False, encoding="utf-8-sig")
     default_name = f"pubmed_{last_query[:30].replace(' ', '_')}"
     csv_filename = st.text_input("파일 이름", value=default_name)
@@ -307,8 +308,11 @@ if "articles" in st.session_state and st.session_state.articles:
             st.markdown(f"#### {i}. [{art['Title']}]({art['Link']})")
             meta_col1, meta_col2, meta_col3 = st.columns(3)
             with meta_col1:
-                first_author = art['First_Author'].split(',')[0] if art['First_Author'] else '저자 정보 없음'
+                first_author = art['First_Author'].split(',')[0].strip() if art['First_Author'] else '저자 정보 없음'
                 st.caption(f"👤 {first_author}")
+                if art['First_Author'] and ',' in art['First_Author']:
+                    with st.expander("전체 저자 보기"):
+                        st.caption(art['First_Author'])
             with meta_col2:
                 st.caption(f"📰 {art['Journal'] or '저널 정보 없음'}")
             with meta_col3:
