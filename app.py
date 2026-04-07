@@ -271,21 +271,23 @@ if "articles" in st.session_state and st.session_state.articles:
 
     st.success(f"**{len(articles)}개** 논문을 찾았습니다.")
 
-    # 결과 내 재검색
-    filter_term = st.text_input("결과 내 재검색 (쉼표로 구분 시 AND 검색)", placeholder="예: EGFR, lung cancer", key="filter")
-    if filter_term.strip():
-        keywords = [k.strip() for k in filter_term.strip().lower().split(",") if k.strip()]
-        articles = [
-            a for a in articles
-            if all(
-                kw in a["Title"].lower()
-                or kw in a["First_Author"].lower()
-                or kw in a["Journal"].lower()
-                or kw in a["Abstract"].lower()
-                for kw in keywords
-            )
-        ]
-        st.caption(f"재검색 결과: **{len(articles)}개** (키워드: {', '.join(keywords)})")
+    # 결과에서 제외
+    excol1, excol2 = st.columns([3, 1])
+    with excol1:
+        exclude_term = st.text_input("결과에서 제외 (쉼표로 구분 시 OR 제외)", placeholder="예: review, meta-analysis", key="exclude")
+    with excol2:
+        exclude_field = st.selectbox("제외 범위", ["제목/초록", "제목만", "저자"], key="exclude_field")
+    if exclude_term.strip():
+        keywords = [k.strip() for k in exclude_term.strip().lower().split(",") if k.strip()]
+        def match_exclude(a, kw):
+            if exclude_field == "제목/초록":
+                return kw in a["Title"].lower() or kw in a["Abstract"].lower()
+            elif exclude_field == "제목만":
+                return kw in a["Title"].lower()
+            else:
+                return kw in a["First_Author"].lower()
+        articles = [a for a in articles if not any(match_exclude(a, kw) for kw in keywords)]
+        st.caption(f"제외 후 결과: **{len(articles)}개** (제외 키워드: {', '.join(keywords)})")
 
     # CSV 다운로드
     df = pd.DataFrame(articles)
