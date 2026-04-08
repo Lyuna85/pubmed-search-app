@@ -37,6 +37,7 @@ def search_pubmed(query, max_results, email, year_start=None, year_end=None):
         "retmode": "json",
         "email": email,
         "tool": "pubmed-streamlit-app",
+        "api_key": st.secrets.get("NCBI_API_KEY", ""),
     }
     if year_start and year_end:
         params["mindate"] = f"{year_start}/01/01"
@@ -74,6 +75,7 @@ def fetch_details(pmids, email):
         "rettype": "abstract",
         "email": email,
         "tool": "pubmed-streamlit-app",
+        "api_key": st.secrets.get("NCBI_API_KEY", ""),
     }
     response = requests.get(EFETCH_URL, params=params, timeout=30)
     response.raise_for_status()
